@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -g -mavx2 -mfma
+CFLAGS = -Wall -Wextra -g -mavx2 -mfma -fopenmp
 
 TARGET = program
 SRC = main.c linalg_plain.c linalg_simd.c

@@ -5,8 +5,8 @@
 #include "linalg.h"
 
 #define SIZE 500000
-#define MATRIX_SIZE 40000
-#define MATRIX_MUL_SIZE 1000  // Smaller size for matrix-matrix multiplication
+#define MATRIX_SIZE 4000
+#define MATRIX_MUL_SIZE 2000  // Smaller size for matrix-matrix multiplication
 
 void test_scalar_mul(const char* name, void (*func)(const float, const Matrix2D*, Matrix2D*)) {
     Matrix2D vec = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
@@ -145,9 +145,9 @@ void compare_matrix_mul_matrix_implementations() {
         .cols = k
     };
     Matrix2D matrix2 = {
-        .data = malloc(n * k * sizeof(float)),  // Note: dimensions are swapped for transposed storage
-        .rows = n,
-        .cols = k
+        .data = malloc(k * n * sizeof(float)),
+        .rows = k,
+        .cols = n
     };
     Matrix2D result_plain = {
         .data = malloc(m * n * sizeof(float)),
@@ -166,11 +166,10 @@ void compare_matrix_mul_matrix_implementations() {
             MATRIX2D_AT(matrix1, i, j) = (float)((i + j) % 10);
         }
     }
-    // Initialize matrix2 in transposed form
-    for (size_t i = 0; i < n; i++) {
-        for (size_t j = 0; j < k; j++) {
-            // Note: i and j are swapped in the initialization to account for transposition
-            MATRIX2D_AT(matrix2, i, j) = (float)((j * i) % 10);
+    // Initialize matrix2 in normal form
+    for (size_t i = 0; i < k; i++) {
+        for (size_t j = 0; j < n; j++) {
+            MATRIX2D_AT(matrix2, i, j) = (float)((i * j) % 10);
         }
     }
     
@@ -188,8 +187,8 @@ void compare_matrix_mul_matrix_implementations() {
     
     // Print comparison
     printf("Matrix-Matrix Multiplication Comparison:\n");
-    printf("Matrix1: %zux%zu, Matrix2 (transposed): %zux%zu, Result: %zux%zu\n", 
-           m, k, n, k, m, n);
+    printf("Matrix1: %zux%zu, Matrix2: %zux%zu, Result: %zux%zu\n", 
+           m, k, k, n, m, n);
     printf("Plain implementation: %f seconds\n", time_plain);
     printf("SIMD implementation:  %f seconds\n", time_simd);
     printf("Speedup: %.2fx\n\n", time_plain / time_simd);
