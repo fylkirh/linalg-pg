@@ -156,3 +156,47 @@ void _matrixMulMatrixTSimd(const Matrix2D *matrix1, const Matrix2D *matrix2T, Ma
     transposeMatrixSimd(matrix2, &matrix2T);
     _matrixMulMatrixTSimd(matrix1, &matrix2T, result);
  }
+
+
+
+
+
+void _matmulTileKernel(const float* A, const float* B, float* R,
+                 size_t M, size_t N, size_t K,
+                 size_t lda, size_t ldb, size_t ldc) {
+    const size_t simd_width = 8;
+    for (size_t i = 0; i < M; ++i) {
+        for (size_t k = 0; k < K; ++k) {
+            __m256 a_val = _mm256_set1_ps(A[i * lda + k]);
+            for (size_t j = 0; j + simd_width <= N; j += simd_width) {
+                __m256 b_vec = _mm256_loadu_ps(&B[k * ldb + j]);  // B[k][j..j+7]
+                __m256 r_vec = _mm256_loadu_ps(&R[i * ldc + j]);
+                r_vec = _mm256_fmadd_ps(a_val, b_vec, r_vec);
+                _mm256_storeu_ps(&R[i * ldc + j], r_vec);
+            }
+             // Tail scalar fallback
+            for (size_t j = N - (N % simd_width); j < N; ++j) {
+                R[i * ldc + j] += A[i * lda + k] * B[k * ldb + j];
+            }
+        }
+    }
+}
+
+
+ void matrixMulMatrixTiled(const Matrix2D *matrix1, const Matrix2D *matrix2, Matrix2D *result) {
+    const size_t TILE = 64;
+    size_t M, N, K;
+    assert(matrix1->cols == matrix2->rows); // shared inner dim
+    assert(matrix1->rows == result->rows);
+    assert(matrix2->cols == result->cols); // matrix2T rows = matrix2 cols
+    for (size_t i = 0; i < matrix1->rows; i += TILE) {
+        M = i + TILE > matrix1->rows ? matrix1->rows - i : TILE;
+        for (size_t j = 0; j < matrix2->cols; j += TILE) {
+        N = (j + TILE > matrix2->cols) ? (matrix2->cols - j) : TILE;
+        for (size_t k = 0; k < matrix1->cols; k += TILE) {
+            K = (k + TILE > matrix1->cols) ? (matrix1->cols - k) : TILE;
+                _matmulTileKernel(&MATRIX2D_AT(*matrix1, i, k), &MATRIX2D_AT(*matrix2, k, j), &MATRIX2D_AT(*result,i, j), M, N, K, matrix1->cols, matrix2->cols, result->cols);
+            }
+        }
+    }
+ }

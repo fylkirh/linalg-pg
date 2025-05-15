@@ -20,3 +20,4 @@ void matrixMulVecSimd(const Matrix2D *matrix, const Matrix2D *vec, Matrix2D *res
 
 void matrixMulMatrix(const Matrix2D *matrix1, const Matrix2D *matrix2, Matrix2D *result);
 void matrixMulMatrixSimd(const Matrix2D *matrix1, const Matrix2D *matrix2, Matrix2D *result);
+void matrixMulMatrixTiled(const Matrix2D *matrix1, const Matrix2D *matrix2, Matrix2D *result);

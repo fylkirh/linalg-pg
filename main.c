@@ -6,7 +6,7 @@
 
 #define SIZE 500000
 #define MATRIX_SIZE 4000
-#define MATRIX_MUL_SIZE 2000  // Smaller size for matrix-matrix multiplication
+#define MATRIX_MUL_SIZE 1000  // Smaller size for matrix-matrix multiplication
 
 void test_scalar_mul(const char* name, void (*func)(const float, const Matrix2D*, Matrix2D*)) {
     Matrix2D vec = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
@@ -159,6 +159,12 @@ void compare_matrix_mul_matrix_implementations() {
         .rows = m,
         .cols = n
     };
+
+    Matrix2D result_tiled = {
+        .data = malloc(m * n * sizeof(float)),
+        .rows = m,
+        .cols = n
+    };
     
     // Initialize matrices
     for (size_t i = 0; i < m; i++) {
@@ -184,6 +190,12 @@ void compare_matrix_mul_matrix_implementations() {
     matrixMulMatrixSimd(&matrix1, &matrix2, &result_simd);
     clock_t end_simd = clock();
     double time_simd = ((double)(end_simd - start_simd)) / CLOCKS_PER_SEC;
+
+    // Test tiled implementation
+    clock_t start_tiled = clock();
+    matrixMulMatrixTiled(&matrix1, &matrix2, &result_tiled);
+    clock_t end_tiled = clock();
+    double time_tiled = ((double)(end_tiled - start_tiled)) / CLOCKS_PER_SEC;
     
     // Print comparison
     printf("Matrix-Matrix Multiplication Comparison:\n");
@@ -191,7 +203,9 @@ void compare_matrix_mul_matrix_implementations() {
            m, k, k, n, m, n);
     printf("Plain implementation: %f seconds\n", time_plain);
     printf("SIMD implementation:  %f seconds\n", time_simd);
-    printf("Speedup: %.2fx\n\n", time_plain / time_simd);
+    printf("Tiled implementation:  %f seconds\n", time_tiled);
+    printf("Speedup simd: %.2fx\n", time_plain / time_simd);
+    printf("Speedup tiled: %.2fx\n\n", time_plain / time_tiled);
     
     // Verify results match
     int results_match = 1;
