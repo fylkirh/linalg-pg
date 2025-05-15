@@ -17,3 +17,6 @@ float dotSimd(const Matrix2D *vec1, const Matrix2D *vec2);
 
 void matrixMulVec(const Matrix2D *matrix, const Matrix2D *vec, Matrix2D *result);
 void matrixMulVecSimd(const Matrix2D *matrix, const Matrix2D *vec, Matrix2D *result);
+
+void matrixMulMatrix(const Matrix2D *matrix1, const Matrix2D *matrix2, Matrix2D *result);
+void matrixMulMatrixSimd(const Matrix2D *matrix1, const Matrix2D *matrix2, Matrix2D *result);

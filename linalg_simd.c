@@ -2,6 +2,8 @@
 #include <immintrin.h>
 #include <assert.h>
 
+#define TILE_SIZE 64
+
 static inline float horizontal_add(__m256 v) {
     __m128 low = _mm256_castps256_ps128(v);
     __m128 high = _mm256_extractf128_ps(v, 1);
@@ -25,7 +27,7 @@ void scalarMulVecSimd(const float scalar, const Matrix2D *vec, Matrix2D *result)
         _mm256_storeu_ps(&result->data[i], mul_result);
     }
     
-    for (; i < vec->rows * vec->cols; i++) {
+    for (; i < vec->rows * vec->cols; ++i) {
         result->data[i] = scalar * vec->data[i];
     }
 }
@@ -53,7 +55,7 @@ float dotSimd(const Matrix2D *vec1, const Matrix2D *vec2) {
     
     res = horizontal_add(accumulator1);
     
-    for (; i < vec1->cols; i++) {
+    for (; i < vec1->cols; ++i) {
         res += vec1->data[i] * vec2->data[i];
     }
     
@@ -65,10 +67,25 @@ void matrixMulVecSimd(const Matrix2D *matrix, const Matrix2D *vec, Matrix2D *res
     assert(vec->rows == 1);
     if (matrix->cols == 0 || matrix->rows == 0) return;
     Matrix2D row = {.data = NULL, .rows = 1, .cols = matrix->cols};
-    for (size_t i = 0; i < matrix->rows; i++) {
+    for (size_t i = 0; i < matrix->rows; ++i) {
         row.data = MATRIX2D_ROW(*matrix, i);
         result->data[i] = dotSimd(&row, vec);
     }
 }
 
+void matrixMulMatrixSimd(const Matrix2D *matrix1, const Matrix2D *matrix2T, Matrix2D *result) {
+    assert(matrix1->cols == matrix2T->cols); // shared inner dim
+    assert(matrix1->rows == result->rows);
+    assert(matrix2T->rows == result->cols); // matrix2T rows = matrix2 cols
+    if (matrix1->cols == 0 || matrix1->rows == 0 || matrix2T->rows == 0) return;
+    Matrix2D row1 = {.data = NULL, .rows = 1, .cols = matrix1->cols};
+    Matrix2D row2 = {.data = NULL, .rows = 1, .cols = matrix2T->cols};
+    for (size_t i = 0; i < matrix1->rows; ++i) {
+        row1.data = MATRIX2D_ROW(*matrix1, i);
+        for (size_t j = 0; j < matrix2T->rows; ++j) {
+            row2.data = MATRIX2D_ROW(*matrix2T, j);
+            MATRIX2D_AT(*result, i, j) = dotSimd(&row1, &row2);
+        }
+    }
+}
 

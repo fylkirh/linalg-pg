@@ -5,7 +5,8 @@
 #include "linalg.h"
 
 #define SIZE 500000
-#define MATRIX_SIZE 30000
+#define MATRIX_SIZE 40000
+#define MATRIX_MUL_SIZE 1000  // Smaller size for matrix-matrix multiplication
 
 void test_scalar_mul(const char* name, void (*func)(const float, const Matrix2D*, Matrix2D*)) {
     Matrix2D vec = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
@@ -108,7 +109,7 @@ void compare_matrix_mul_implementations() {
     double time_simd = ((double)(end_simd - start_simd)) / CLOCKS_PER_SEC;
     
     // Print comparison
-    printf("Matrix2Drix-Vector Multiplication Comparison (size: %dx%d):\n", MATRIX_SIZE, MATRIX_SIZE);
+    printf("Matrix-Vector Multiplication Comparison (size: %dx%d):\n", MATRIX_SIZE, MATRIX_SIZE);
     printf("Plain implementation: %f seconds\n", time_plain);
     printf("SIMD implementation:  %f seconds\n", time_simd);
     printf("Speedup: %.2fx\n\n", time_plain / time_simd);
@@ -131,6 +132,90 @@ void compare_matrix_mul_implementations() {
     free(result_simd.data);
 }
 
+void compare_matrix_mul_matrix_implementations() {
+    // Define matrix dimensions
+    const size_t m = MATRIX_MUL_SIZE;      // rows of first matrix
+    const size_t k = MATRIX_MUL_SIZE/2;    // cols of first matrix / rows of second matrix
+    const size_t n = MATRIX_MUL_SIZE*2;    // cols of second matrix
+    
+    // Allocate matrices
+    Matrix2D matrix1 = {
+        .data = malloc(m * k * sizeof(float)),
+        .rows = m,
+        .cols = k
+    };
+    Matrix2D matrix2 = {
+        .data = malloc(n * k * sizeof(float)),  // Note: dimensions are swapped for transposed storage
+        .rows = n,
+        .cols = k
+    };
+    Matrix2D result_plain = {
+        .data = malloc(m * n * sizeof(float)),
+        .rows = m,
+        .cols = n
+    };
+    Matrix2D result_simd = {
+        .data = malloc(m * n * sizeof(float)),
+        .rows = m,
+        .cols = n
+    };
+    
+    // Initialize matrices
+    for (size_t i = 0; i < m; i++) {
+        for (size_t j = 0; j < k; j++) {
+            MATRIX2D_AT(matrix1, i, j) = (float)((i + j) % 10);
+        }
+    }
+    // Initialize matrix2 in transposed form
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < k; j++) {
+            // Note: i and j are swapped in the initialization to account for transposition
+            MATRIX2D_AT(matrix2, i, j) = (float)((j * i) % 10);
+        }
+    }
+    
+    // Test plain implementation
+    clock_t start_plain = clock();
+    matrixMulMatrix(&matrix1, &matrix2, &result_plain);
+    clock_t end_plain = clock();
+    double time_plain = ((double)(end_plain - start_plain)) / CLOCKS_PER_SEC;
+    
+    // Test SIMD implementation
+    clock_t start_simd = clock();
+    matrixMulMatrixSimd(&matrix1, &matrix2, &result_simd);
+    clock_t end_simd = clock();
+    double time_simd = ((double)(end_simd - start_simd)) / CLOCKS_PER_SEC;
+    
+    // Print comparison
+    printf("Matrix-Matrix Multiplication Comparison:\n");
+    printf("Matrix1: %zux%zu, Matrix2 (transposed): %zux%zu, Result: %zux%zu\n", 
+           m, k, n, k, m, n);
+    printf("Plain implementation: %f seconds\n", time_plain);
+    printf("SIMD implementation:  %f seconds\n", time_simd);
+    printf("Speedup: %.2fx\n\n", time_plain / time_simd);
+    
+    // Verify results match
+    int results_match = 1;
+    for (size_t i = 0; i < m; i++) {
+        for (size_t j = 0; j < n; j++) {
+            if (fabs(MATRIX2D_AT(result_plain, i, j) - MATRIX2D_AT(result_simd, i, j)) > 1e-6) {
+                results_match = 0;
+                printf("Results differ at index (%zu,%zu): %f vs %f\n", 
+                       i, j, MATRIX2D_AT(result_plain, i, j), MATRIX2D_AT(result_simd, i, j));
+                goto end_verification;  // Break out of nested loops
+            }
+        }
+    }
+end_verification:
+    printf("Results %s\n\n", results_match ? "match" : "differ");
+    
+    // Free allocated memory
+    free(matrix1.data);
+    free(matrix2.data);
+    free(result_plain.data);
+    free(result_simd.data);
+}
+
 int main() {
     printf("Testing vector scalar multiplication with size %d\n\n", SIZE);
     
@@ -140,8 +225,12 @@ int main() {
     printf("Testing dot product with size %d\n\n", SIZE);
     test_dot("Plain", dot);
     test_dot("SIMD", dotSimd);
+    
     printf("Testing matrix-vector multiplication:\n");
     compare_matrix_mul_implementations();
+    
+    printf("Testing matrix-matrix multiplication:\n");
+    compare_matrix_mul_matrix_implementations();
     
     return 0;
 } 
