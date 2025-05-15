@@ -7,9 +7,9 @@
 #define SIZE 500000
 #define MATRIX_SIZE 30000
 
-void test_scalar_mul(const char* name, void (*func)(const float, const Mat*, Mat*)) {
-    Mat vec = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
-    Mat result = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
+void test_scalar_mul(const char* name, void (*func)(const float, const Matrix2D*, Matrix2D*)) {
+    Matrix2D vec = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
+    Matrix2D result = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
     float scalar = 2.0f;
     
     // Initialize input vector
@@ -38,9 +38,9 @@ void test_scalar_mul(const char* name, void (*func)(const float, const Mat*, Mat
     free(result.data);
 }
 
-void test_dot(const char* name, float (*func)(const Mat*, const Mat*)) {
-    Mat vec1 = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
-    Mat vec2 = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
+void test_dot(const char* name, float (*func)(const Matrix2D*, const Matrix2D*)) {
+    Matrix2D vec1 = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
+    Matrix2D vec2 = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
     
     // Initialize input vectors
     for (size_t i = 0; i < SIZE; i++) {
@@ -66,22 +66,22 @@ void test_dot(const char* name, float (*func)(const Mat*, const Mat*)) {
 
 void compare_matrix_mul_implementations() {
     // Allocate matrices
-    Mat matrix = {
+    Matrix2D matrix = {
         .data = malloc(MATRIX_SIZE * MATRIX_SIZE * sizeof(float)),
         .rows = MATRIX_SIZE,
         .cols = MATRIX_SIZE
     };
-    Mat vec = {
+    Matrix2D vec = {
         .data = malloc(MATRIX_SIZE * sizeof(float)),
         .rows = 1,
         .cols = MATRIX_SIZE
     };
-    Mat result_plain = {
+    Matrix2D result_plain = {
         .data = malloc(MATRIX_SIZE * sizeof(float)),
         .rows = 1,
         .cols = MATRIX_SIZE
     };
-    Mat result_simd = {
+    Matrix2D result_simd = {
         .data = malloc(MATRIX_SIZE * sizeof(float)),
         .rows = 1,
         .cols = MATRIX_SIZE
@@ -90,7 +90,7 @@ void compare_matrix_mul_implementations() {
     // Initialize matrix and vector
     for (size_t i = 0; i < MATRIX_SIZE; i++) {
         for (size_t j = 0; j < MATRIX_SIZE; j++) {
-            MAT_AT(matrix, i, j) = (float)((i + j) % 10);
+            MATRIX2D_AT(matrix, i, j) = (float)((i + j) % 10);
         }
         vec.data[i] = (float)(i % 5);
     }
@@ -108,7 +108,7 @@ void compare_matrix_mul_implementations() {
     double time_simd = ((double)(end_simd - start_simd)) / CLOCKS_PER_SEC;
     
     // Print comparison
-    printf("Matrix-Vector Multiplication Comparison (size: %dx%d):\n", MATRIX_SIZE, MATRIX_SIZE);
+    printf("Matrix2Drix-Vector Multiplication Comparison (size: %dx%d):\n", MATRIX_SIZE, MATRIX_SIZE);
     printf("Plain implementation: %f seconds\n", time_plain);
     printf("SIMD implementation:  %f seconds\n", time_simd);
     printf("Speedup: %.2fx\n\n", time_plain / time_simd);

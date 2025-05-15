@@ -4,16 +4,16 @@ typedef struct {
     float* data;        // flat array
     size_t rows;
     size_t cols;
-} Mat;
+} Matrix2D;
 
-#define MAT_AT(mat, i, j) ((mat).data[(i) * (mat).cols + (j)])
-#define MAT_ROW(mat, i) (&((mat).data[(i) * (mat).cols]))
+#define MATRIX2D_AT(mat, i, j) ((mat).data[(i) * (mat).cols + (j)])
+#define MATRIX2D_ROW(mat, i) (&((mat).data[(i) * (mat).cols]))
 
-void scalarMulVec(const float scalar, const Mat *vec, Mat *result);
-void scalarMulVecSimd(const float scalar, const Mat *vec, Mat *result);
+void scalarMulVec(const float scalar, const Matrix2D *vec, Matrix2D *result);
+void scalarMulVecSimd(const float scalar, const Matrix2D *vec, Matrix2D *result);
 
-float dot(const Mat *vec1, const Mat *vec2);
-float dotSimd(const Mat *vec1, const Mat *vec2);
+float dot(const Matrix2D *vec1, const Matrix2D *vec2);
+float dotSimd(const Matrix2D *vec1, const Matrix2D *vec2);
 
-void matrixMulVec(const Mat *matrix, const Mat *vec, Mat *result);
-void matrixMulVecSimd(const Mat *matrix, const Mat *vec, Mat *result);
+void matrixMulVec(const Matrix2D *matrix, const Matrix2D *vec, Matrix2D *result);
+void matrixMulVecSimd(const Matrix2D *matrix, const Matrix2D *vec, Matrix2D *result);

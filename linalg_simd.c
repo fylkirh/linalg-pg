@@ -1,6 +1,6 @@
 #include "linalg.h"
 #include <immintrin.h>
-#include <string.h>
+#include <assert.h>
 
 static inline float horizontal_add(__m256 v) {
     __m128 low = _mm256_castps256_ps128(v);
@@ -11,7 +11,9 @@ static inline float horizontal_add(__m256 v) {
     return _mm_cvtss_f32(sum);
 }
 
-void scalarMulVecSimd(const float scalar, const Mat *vec, Mat *result) {
+void scalarMulVecSimd(const float scalar, const Matrix2D *vec, Matrix2D *result) {
+    assert(vec->rows == 1);
+    if (vec->cols == 0) return;
     const size_t simd_width = 8;
     size_t i;
     
@@ -28,7 +30,9 @@ void scalarMulVecSimd(const float scalar, const Mat *vec, Mat *result) {
     }
 }
 
-float dotSimd(const Mat *vec1, const Mat *vec2) {
+float dotSimd(const Matrix2D *vec1, const Matrix2D *vec2) {
+    assert(vec1->cols == vec2->cols);
+    assert(vec1->rows == vec2->rows == 1);
     const size_t simd_width = 8;
     size_t i;
     float res = 0.0f;
@@ -56,11 +60,13 @@ float dotSimd(const Mat *vec1, const Mat *vec2) {
     return res;
 }
 
-void matrixMulVecSimd(const Mat *matrix, const Mat *vec, Mat *result) {
-    
-    Mat row = {.data = NULL, .rows = 1, .cols = matrix->cols};
+void matrixMulVecSimd(const Matrix2D *matrix, const Matrix2D *vec, Matrix2D *result) {
+    assert(matrix->cols == vec->cols);
+    assert(vec->rows == 1);
+    if (matrix->cols == 0 || matrix->rows == 0) return;
+    Matrix2D row = {.data = NULL, .rows = 1, .cols = matrix->cols};
     for (size_t i = 0; i < matrix->rows; i++) {
-        row.data = MAT_ROW(*matrix, i);
+        row.data = MATRIX2D_ROW(*matrix, i);
         result->data[i] = dotSimd(&row, vec);
     }
 }
