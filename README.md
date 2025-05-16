@@ -1,4 +1,4 @@
-# C Project
+# Linear Algebra Playground
 
 A basic C project template.
 
