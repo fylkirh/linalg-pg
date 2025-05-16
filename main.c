@@ -6,7 +6,7 @@
 
 #define SIZE 500000
 #define MATRIX_SIZE 4000
-#define MATRIX_MUL_SIZE 1000  // Smaller size for matrix-matrix multiplication
+#define MATRIX_MUL_SIZE 4196  // Smaller size for matrix-matrix multiplication
 
 void test_scalar_mul(const char* name, void (*func)(const float, const Matrix2D*, Matrix2D*)) {
     Matrix2D vec = {.data = malloc(SIZE * sizeof(float)), .rows = 1, .cols = SIZE};
@@ -150,18 +150,17 @@ void compare_matrix_mul_matrix_implementations() {
         .cols = n
     };
     Matrix2D result_plain = {
-        .data = malloc(m * n * sizeof(float)),
+        .data = calloc(m * n, sizeof(float)),
         .rows = m,
         .cols = n
     };
     Matrix2D result_simd = {
-        .data = malloc(m * n * sizeof(float)),
+        .data = calloc(m * n, sizeof(float)),
         .rows = m,
         .cols = n
     };
-
     Matrix2D result_tiled = {
-        .data = malloc(m * n * sizeof(float)),
+        .data = calloc(m * n, sizeof(float)),
         .rows = m,
         .cols = n
     };
@@ -181,7 +180,7 @@ void compare_matrix_mul_matrix_implementations() {
     
     // Test plain implementation
     clock_t start_plain = clock();
-    matrixMulMatrix(&matrix1, &matrix2, &result_plain);
+    // matrixMulMatrix(&matrix1, &matrix2, &result_plain);
     clock_t end_plain = clock();
     double time_plain = ((double)(end_plain - start_plain)) / CLOCKS_PER_SEC;
     
@@ -201,20 +200,21 @@ void compare_matrix_mul_matrix_implementations() {
     printf("Matrix-Matrix Multiplication Comparison:\n");
     printf("Matrix1: %zux%zu, Matrix2: %zux%zu, Result: %zux%zu\n", 
            m, k, k, n, m, n);
-    printf("Plain implementation: %f seconds\n", time_plain);
+    // printf("Plain implementation: %f seconds\n", time_plain);
     printf("SIMD implementation:  %f seconds\n", time_simd);
     printf("Tiled implementation:  %f seconds\n", time_tiled);
-    printf("Speedup simd: %.2fx\n", time_plain / time_simd);
-    printf("Speedup tiled: %.2fx\n\n", time_plain / time_tiled);
+    // printf("Speedup simd: %.2fx\n", time_plain / time_simd);
+    // printf("Speedup tiled: %.2fx\n\n", time_plain / time_tiled);
+    printf("Speedup %.2fx\n\n", time_simd/ time_tiled);
     
     // Verify results match
     int results_match = 1;
     for (size_t i = 0; i < m; i++) {
         for (size_t j = 0; j < n; j++) {
-            if (fabs(MATRIX2D_AT(result_plain, i, j) - MATRIX2D_AT(result_simd, i, j)) > 1e-6) {
+            if (fabs(MATRIX2D_AT(result_tiled, i, j) - MATRIX2D_AT(result_simd, i, j)) > 1e-6) {
                 results_match = 0;
                 printf("Results differ at index (%zu,%zu): %f vs %f\n", 
-                       i, j, MATRIX2D_AT(result_plain, i, j), MATRIX2D_AT(result_simd, i, j));
+                       i, j, MATRIX2D_AT(result_tiled, i, j), MATRIX2D_AT(result_simd, i, j));
                 goto end_verification;  // Break out of nested loops
             }
         }
@@ -227,6 +227,7 @@ end_verification:
     free(matrix2.data);
     free(result_plain.data);
     free(result_simd.data);
+    free(result_tiled.data);
 }
 
 int main() {

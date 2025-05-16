@@ -1,8 +1,11 @@
 #include "linalg.h"
 #include <immintrin.h>
 #include <assert.h>
+#include <omp.h>
 
 #define TILE_SIZE 64
+
+
 
 static inline float horizontal_add(__m256 v) {
     __m128 low = _mm256_castps256_ps128(v);
@@ -34,7 +37,7 @@ void scalarMulVecSimd(const float scalar, const Matrix2D *vec, Matrix2D *result)
 
 float dotSimd(const Matrix2D *vec1, const Matrix2D *vec2) {
     assert(vec1->cols == vec2->cols);
-    assert(vec1->rows == vec2->rows == 1);
+    assert(vec1->rows == 1 && vec2->rows == 1);
     const size_t simd_width = 8;
     size_t i;
     float res = 0.0f;
@@ -161,7 +164,7 @@ void _matrixMulMatrixTSimd(const Matrix2D *matrix1, const Matrix2D *matrix2T, Ma
 
 
 
-void _matmulTileKernel(const float* A, const float* B, float* R,
+void _matmulTileKernelElastic(const float* A, const float* B, float* R,
                  size_t M, size_t N, size_t K,
                  size_t lda, size_t ldb, size_t ldc) {
     const size_t simd_width = 8;
@@ -182,20 +185,188 @@ void _matmulTileKernel(const float* A, const float* B, float* R,
     }
 }
 
+void _matmulTileKernel32(const float* A, const float* B, float* R,
+                 size_t lda, size_t ldb, size_t ldc) {
+    const size_t simd_width = 8;
+    const size_t TILE = simd_width * 4;
+    for (size_t i = 0; i < TILE; ++i) {
+        __m256 acc0 = _mm256_loadu_ps(&R[i * ldc                ]);
+        __m256 acc1 = _mm256_loadu_ps(&R[i * ldc +    simd_width]);
+        __m256 acc2 = _mm256_loadu_ps(&R[i * ldc + 2 *simd_width]);
+        __m256 acc3 = _mm256_loadu_ps(&R[i * ldc + 3 *simd_width]);
+        for (size_t k = 0; k < TILE; ++k) {
+            __m256 a = _mm256_set1_ps(A[i * lda + k]);
+            __m256 b0 = _mm256_loadu_ps(&B[k * ldb                 ]);
+            __m256 b1 = _mm256_loadu_ps(&B[k * ldb +     simd_width]);
+            __m256 b2 = _mm256_loadu_ps(&B[k * ldb + 2 * simd_width]);
+            __m256 b3 = _mm256_loadu_ps(&B[k * ldb + 3 * simd_width]);
+
+            acc0 = _mm256_fmadd_ps(a, b0, acc0);
+            acc1 = _mm256_fmadd_ps(a, b1, acc1);
+            acc2 = _mm256_fmadd_ps(a, b2, acc2);
+            acc3 = _mm256_fmadd_ps(a, b3, acc3);
+        }
+        _mm256_storeu_ps(&R[i * ldc                 ], acc0);
+        _mm256_storeu_ps(&R[i * ldc +     simd_width], acc1);
+        _mm256_storeu_ps(&R[i * ldc + 2 * simd_width], acc2);
+        _mm256_storeu_ps(&R[i * ldc + 3 * simd_width], acc3);
+    }
+}
+
+void _matmulTileKernel64(const float* A, const float* B, float* R,
+                 size_t lda, size_t ldb, size_t ldc) {
+    const size_t simd_width = 8;
+    const size_t TILE = simd_width * 8;
+    for (size_t i = 0; i < TILE; ++i) {
+        __m256 acc0 = _mm256_loadu_ps(&R[i * ldc                ]);
+        __m256 acc1 = _mm256_loadu_ps(&R[i * ldc +     simd_width]);
+        __m256 acc2 = _mm256_loadu_ps(&R[i * ldc + 2 * simd_width]);
+        __m256 acc3 = _mm256_loadu_ps(&R[i * ldc + 3 * simd_width]);
+        __m256 acc4 = _mm256_loadu_ps(&R[i * ldc + 4 * simd_width]);
+        __m256 acc5 = _mm256_loadu_ps(&R[i * ldc + 5 * simd_width]);
+        __m256 acc6 = _mm256_loadu_ps(&R[i * ldc + 6 * simd_width]);
+        __m256 acc7 = _mm256_loadu_ps(&R[i * ldc + 7 * simd_width]);
+        
+        for (size_t k = 0; k < TILE; ++k) {
+            __m256 a = _mm256_set1_ps(A[i * lda + k]);
+            __m256 b0 = _mm256_loadu_ps(&B[k * ldb                 ]);
+            __m256 b1 = _mm256_loadu_ps(&B[k * ldb +     simd_width]);
+            __m256 b2 = _mm256_loadu_ps(&B[k * ldb + 2 * simd_width]);
+            __m256 b3 = _mm256_loadu_ps(&B[k * ldb + 3 * simd_width]);
+            __m256 b4 = _mm256_loadu_ps(&B[k * ldb + 4 * simd_width]);
+            __m256 b5 = _mm256_loadu_ps(&B[k * ldb + 5 * simd_width]);
+            __m256 b6 = _mm256_loadu_ps(&B[k * ldb + 6 * simd_width]);
+            __m256 b7 = _mm256_loadu_ps(&B[k * ldb + 7 * simd_width]);
+
+            acc0 = _mm256_fmadd_ps(a, b0, acc0);
+            acc1 = _mm256_fmadd_ps(a, b1, acc1);
+            acc2 = _mm256_fmadd_ps(a, b2, acc2);
+            acc3 = _mm256_fmadd_ps(a, b3, acc3);
+            acc4 = _mm256_fmadd_ps(a, b4, acc4);
+            acc5 = _mm256_fmadd_ps(a, b5, acc5);
+            acc6 = _mm256_fmadd_ps(a, b6, acc6);
+            acc7 = _mm256_fmadd_ps(a, b7, acc7);
+        }
+        
+        _mm256_storeu_ps(&R[i * ldc                 ], acc0);
+        _mm256_storeu_ps(&R[i * ldc +     simd_width], acc1);
+        _mm256_storeu_ps(&R[i * ldc + 2 * simd_width], acc2);
+        _mm256_storeu_ps(&R[i * ldc + 3 * simd_width], acc3);
+        _mm256_storeu_ps(&R[i * ldc + 4 * simd_width], acc4);
+        _mm256_storeu_ps(&R[i * ldc + 5 * simd_width], acc5);
+        _mm256_storeu_ps(&R[i * ldc + 6 * simd_width], acc6);
+        _mm256_storeu_ps(&R[i * ldc + 7 * simd_width], acc7);
+    }
+}
+
+void _matmulTileKernel128(const float* A, const float* B, float* R,
+                 size_t lda, size_t ldb, size_t ldc) {
+    const size_t simd_width = 8;
+    const size_t TILE = simd_width * 16;
+    for (size_t i = 0; i < TILE; ++i) {
+        __m256 acc0 = _mm256_loadu_ps(&R[i * ldc                  ]);
+        __m256 acc1 = _mm256_loadu_ps(&R[i * ldc +     simd_width]);
+        __m256 acc2 = _mm256_loadu_ps(&R[i * ldc + 2 * simd_width]);
+        __m256 acc3 = _mm256_loadu_ps(&R[i * ldc + 3 * simd_width]);
+        __m256 acc4 = _mm256_loadu_ps(&R[i * ldc + 4 * simd_width]);
+        __m256 acc5 = _mm256_loadu_ps(&R[i * ldc + 5 * simd_width]);
+        __m256 acc6 = _mm256_loadu_ps(&R[i * ldc + 6 * simd_width]);
+        __m256 acc7 = _mm256_loadu_ps(&R[i * ldc + 7 * simd_width]);
+        __m256 acc8 = _mm256_loadu_ps(&R[i * ldc + 8 * simd_width]);
+        __m256 acc9 = _mm256_loadu_ps(&R[i * ldc + 9 * simd_width]);
+        __m256 acc10 = _mm256_loadu_ps(&R[i * ldc + 10 * simd_width]);
+        __m256 acc11 = _mm256_loadu_ps(&R[i * ldc + 11 * simd_width]);
+        __m256 acc12 = _mm256_loadu_ps(&R[i * ldc + 12 * simd_width]);
+        __m256 acc13 = _mm256_loadu_ps(&R[i * ldc + 13 * simd_width]);
+        __m256 acc14 = _mm256_loadu_ps(&R[i * ldc + 14 * simd_width]);
+        __m256 acc15 = _mm256_loadu_ps(&R[i * ldc + 15 * simd_width]);
+        
+        for (size_t k = 0; k < TILE; ++k) {
+            __m256 a = _mm256_set1_ps(A[i * lda + k]);
+            __m256 b0 = _mm256_loadu_ps(&B[k * ldb                  ]);
+            __m256 b1 = _mm256_loadu_ps(&B[k * ldb +     simd_width]);
+            __m256 b2 = _mm256_loadu_ps(&B[k * ldb + 2 * simd_width]);
+            __m256 b3 = _mm256_loadu_ps(&B[k * ldb + 3 * simd_width]);
+            __m256 b4 = _mm256_loadu_ps(&B[k * ldb + 4 * simd_width]);
+            __m256 b5 = _mm256_loadu_ps(&B[k * ldb + 5 * simd_width]);
+            __m256 b6 = _mm256_loadu_ps(&B[k * ldb + 6 * simd_width]);
+            __m256 b7 = _mm256_loadu_ps(&B[k * ldb + 7 * simd_width]);
+            __m256 b8 = _mm256_loadu_ps(&B[k * ldb + 8 * simd_width]);
+            __m256 b9 = _mm256_loadu_ps(&B[k * ldb + 9 * simd_width]);
+            __m256 b10 = _mm256_loadu_ps(&B[k * ldb + 10 * simd_width]);
+            __m256 b11 = _mm256_loadu_ps(&B[k * ldb + 11 * simd_width]);
+            __m256 b12 = _mm256_loadu_ps(&B[k * ldb + 12 * simd_width]);
+            __m256 b13 = _mm256_loadu_ps(&B[k * ldb + 13 * simd_width]);
+            __m256 b14 = _mm256_loadu_ps(&B[k * ldb + 14 * simd_width]);
+            __m256 b15 = _mm256_loadu_ps(&B[k * ldb + 15 * simd_width]);
+
+            acc0 = _mm256_fmadd_ps(a, b0, acc0);
+            acc1 = _mm256_fmadd_ps(a, b1, acc1);
+            acc2 = _mm256_fmadd_ps(a, b2, acc2);
+            acc3 = _mm256_fmadd_ps(a, b3, acc3);
+            acc4 = _mm256_fmadd_ps(a, b4, acc4);
+            acc5 = _mm256_fmadd_ps(a, b5, acc5);
+            acc6 = _mm256_fmadd_ps(a, b6, acc6);
+            acc7 = _mm256_fmadd_ps(a, b7, acc7);
+            acc8 = _mm256_fmadd_ps(a, b8, acc8);
+            acc9 = _mm256_fmadd_ps(a, b9, acc9);
+            acc10 = _mm256_fmadd_ps(a, b10, acc10);
+            acc11 = _mm256_fmadd_ps(a, b11, acc11);
+            acc12 = _mm256_fmadd_ps(a, b12, acc12);
+            acc13 = _mm256_fmadd_ps(a, b13, acc13);
+            acc14 = _mm256_fmadd_ps(a, b14, acc14);
+            acc15 = _mm256_fmadd_ps(a, b15, acc15);
+        }
+        
+        _mm256_storeu_ps(&R[i * ldc                  ], acc0);
+        _mm256_storeu_ps(&R[i * ldc +     simd_width], acc1);
+        _mm256_storeu_ps(&R[i * ldc + 2 * simd_width], acc2);
+        _mm256_storeu_ps(&R[i * ldc + 3 * simd_width], acc3);
+        _mm256_storeu_ps(&R[i * ldc + 4 * simd_width], acc4);
+        _mm256_storeu_ps(&R[i * ldc + 5 * simd_width], acc5);
+        _mm256_storeu_ps(&R[i * ldc + 6 * simd_width], acc6);
+        _mm256_storeu_ps(&R[i * ldc + 7 * simd_width], acc7);
+        _mm256_storeu_ps(&R[i * ldc + 8 * simd_width], acc8);
+        _mm256_storeu_ps(&R[i * ldc + 9 * simd_width], acc9);
+        _mm256_storeu_ps(&R[i * ldc + 10 * simd_width], acc10);
+        _mm256_storeu_ps(&R[i * ldc + 11 * simd_width], acc11);
+        _mm256_storeu_ps(&R[i * ldc + 12 * simd_width], acc12);
+        _mm256_storeu_ps(&R[i * ldc + 13 * simd_width], acc13);
+        _mm256_storeu_ps(&R[i * ldc + 14 * simd_width], acc14);
+        _mm256_storeu_ps(&R[i * ldc + 15 * simd_width], acc15);
+    }
+}
+
 
  void matrixMulMatrixTiled(const Matrix2D *matrix1, const Matrix2D *matrix2, Matrix2D *result) {
-    const size_t TILE = 64;
-    size_t M, N, K;
     assert(matrix1->cols == matrix2->rows); // shared inner dim
     assert(matrix1->rows == result->rows);
     assert(matrix2->cols == result->cols); // matrix2T rows = matrix2 cols
+    size_t TILE;
+    void (*kernel)(const float*, const float*, float*, size_t, size_t, size_t);
+    if (matrix1->cols >= 1024) {
+        kernel = &_matmulTileKernel128;
+        TILE = 128;
+    } else if (matrix1-> cols >= 256) {
+        TILE = 64;
+        kernel = &_matmulTileKernel64;
+    } else {
+        TILE = 32;
+        kernel = &_matmulTileKernel32;
+    }
+    omp_set_num_threads(8);
+    #pragma omp parallel for schedule(dynamic, 1)
     for (size_t i = 0; i < matrix1->rows; i += TILE) {
-        M = i + TILE > matrix1->rows ? matrix1->rows - i : TILE;
         for (size_t j = 0; j < matrix2->cols; j += TILE) {
-        N = (j + TILE > matrix2->cols) ? (matrix2->cols - j) : TILE;
-        for (size_t k = 0; k < matrix1->cols; k += TILE) {
-            K = (k + TILE > matrix1->cols) ? (matrix1->cols - k) : TILE;
-                _matmulTileKernel(&MATRIX2D_AT(*matrix1, i, k), &MATRIX2D_AT(*matrix2, k, j), &MATRIX2D_AT(*result,i, j), M, N, K, matrix1->cols, matrix2->cols, result->cols);
+            size_t M = i + TILE > matrix1->rows ? matrix1->rows - i : TILE;
+            size_t N = (j + TILE > matrix2->cols) ? (matrix2->cols - j) : TILE;
+            for (size_t k = 0; k < matrix1->cols; k += TILE) {
+                size_t K = (k + TILE > matrix1->cols) ? (matrix1->cols - k) : TILE;
+                if (M == TILE && N == TILE && K == TILE) {
+                    kernel(&MATRIX2D_AT(*matrix1, i, k), &MATRIX2D_AT(*matrix2, k, j), &MATRIX2D_AT(*result,i, j), matrix1->cols, matrix2->cols, result->cols);
+                } else {
+                    _matmulTileKernelElastic(&MATRIX2D_AT(*matrix1, i, k), &MATRIX2D_AT(*matrix2, k, j), &MATRIX2D_AT(*result,i, j), M, N, K, matrix1->cols, matrix2->cols, result->cols);
+                }
             }
         }
     }
