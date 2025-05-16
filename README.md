@@ -1,7 +1,5 @@
 # Linear Algebra Playground
 
-A basic C project template.
-
 ## Building
 
 To build the project, run:
